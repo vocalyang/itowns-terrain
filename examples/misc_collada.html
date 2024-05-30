@@ -1,0 +1,114 @@
+<html>
+    <head>
+        <title>Itowns - collada</title>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+
+        <!-- Import iTowns source code -->
+        <script src="../dist/itowns.js"></script>
+        <script src="../dist/debug.js"></script>
+
+        <!-- Import iTowns LoadingScreen and GuiTools plugins -->
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="js/GUI/LoadingScreen.js"></script>
+
+        <!-- Import ThreeLoader plugin to get ColladaLoader from three.js -->
+        <script src="js/ThreeLoader.js"></script>
+
+        <script type="text/javascript">
+
+
+
+
+            // ---------- CREATE A GlobeView FOR SUPPORTING DATA VISUALIZATION : ----------
+
+            // Define camera initial position
+            const placement = {
+                coord: new itowns.Coordinates('EPSG:4326', 4.21655, 44.84415),
+                range: 500,
+                heading: 180,
+                tilt: 60,
+            };
+
+            // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+            const viewerDiv = document.getElementById('viewerDiv');
+
+            // Create a GlobeView
+            const view = new itowns.GlobeView(viewerDiv, placement);
+
+            // Setup loading screen and debug menu
+            setupLoadingScreen(viewerDiv, view);
+            const debugMenu = new GuiTools('menuDiv', view);
+
+
+
+            // ---------- DISPLAY CONTEXTUAL DATA : ----------
+
+            // Display ortho-images
+            itowns.Fetcher.json('./layers/JSONLayers/Ortho.json')
+                .then(function _(config) {
+                    config.source = new itowns.WMTSSource(config.source);
+                    view.addLayer(
+                        new itowns.ColorLayer('Ortho', config),
+                    ).then(debugMenu.addLayerGUI.bind(debugMenu));
+                });
+
+            // Display elevation data
+            function addElevationLayerFromConfig(config) {
+                config.source = new itowns.WMTSSource(config.source);
+                view.addLayer(
+                    new itowns.ElevationLayer(config.id, config),
+                ).then(debugMenu.addLayerGUI.bind(debugMenu));
+            }
+            itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json')
+                .then(addElevationLayerFromConfig);
+            itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json')
+                .then(addElevationLayerFromConfig);
+
+
+
+
+            // ---------- DISPLAY COLLADA DATA : ----------
+
+            // ThreeLoader can load each format proposed in ThreeJs examples loaders : 
+            // https://github.com/mrdoob/three.js/tree/dev/examples/js/loaders
+            // Note : As this previous folder has been removed in three r148,
+            // TheeLoader will only use loaders from three r147 version. This
+            // is a temporary solution and shall be updated.
+            const promiseCollada = ThreeLoader.load(
+                'Collada', 
+                'https://raw.githubusercontent.com/iTowns/iTowns2-sample-data/master/models/collada/building.dae',
+            ).then(collada => {
+                const model = collada.scene;
+
+                // building coordinate
+                const coord = new itowns.Coordinates(
+                    'EPSG:4326', 4.2165, 44.844, 1417,
+                );
+
+                model.position.copy(coord.as(view.referenceCrs));
+                // align up vector with geodesic normal
+                model.lookAt(model.position.clone().add(coord.geodesicNormal));
+                // user rotate building to align with ortho image
+                model.rotateZ(-Math.PI * 0.2);
+                model.scale.set(1.2, 1.2, 1.2);
+
+                // update coordinate of the mesh
+                model.updateMatrixWorld();
+
+                view.scene.add(model);
+                view.notifyChange();
+            });
+
+        </script>
+    </body>
+</html>

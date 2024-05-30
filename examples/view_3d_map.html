@@ -1,0 +1,567 @@
+<html>
+
+<head>
+    <title>Itowns - Globe</title>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" type="text/css" href="css/example.css">
+    <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+    <link rel="stylesheet" type="text/css" href="css/widgets.css">
+    <script src="https://cdn.jsdelivr.net/npm/kdbush"></script>
+    <!-- <script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js"></script> -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+</head>
+
+<body>
+    <div id="viewerDiv"></div>
+
+    <!-- Import iTowns source code -->
+    <script src="../dist/itowns.js"></script>
+    <script src="../dist/debug.js"></script>
+    <!-- Import iTowns Widgets plugin -->
+    <script src="../dist/itowns_widgets.js"></script>
+    <!-- Import iTowns LoadingScreen and GuiTools plugins -->
+    <script src="js/GUI/GuiTools.js"></script>
+    <script src="js/GUI/LoadingScreen.js"></script>
+
+
+    <script type="text/javascript">
+
+
+
+        // ---------- CREATE A GlobeView FOR SUPPORTING DATA VISUALIZATION : ----------
+
+        // Define camera initial position
+        const placement = {
+            // coord: new itowns.Coordinates('EPSG:4326', 121.5, 31.1),
+            coord: new itowns.Coordinates('EPSG:4326', 117, 36.65),
+            range: 25000,
+        }
+
+        // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+        const viewerDiv = document.getElementById('viewerDiv');
+
+        // Create a GlobeView
+        const view = new itowns.GlobeView(viewerDiv, placement, {
+            maxDeltaElevationLevel: 4
+        });
+        // view.controls.states.setFromOptions({
+        //     PANORAMIC: {
+        //         enable: true,
+        //         mouseButton: itowns.THREE.MOUSE.LEFT
+        //     },
+        //     MOVE_GLOBE: {
+        //         enable: false
+        //     },
+        // });
+        view.controls.minDistance = 1;
+        view.controls.states.setFromOptions({})
+
+        // Setup loading screen and debug menu
+        setupLoadingScreen(viewerDiv, view);
+        const debugMenu = new GuiTools('menuDiv', view);
+
+
+
+        // ---------- DISPLAY ORTHO-IMAGES : ----------
+
+        // Add one imagery layer to the scene. This layer's properties are defined in a json file, but it could be
+        // defined as a plain js object. See `Layer` documentation for more info.
+        // const fc = itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(function _(config) {
+        //     config.source = new itowns.WMTSSource(config.source);
+        //     view.addLayer(
+        //         new itowns.ColorLayer('Ortho', config),
+        //     ).then(debugMenu.addLayerGUI.bind(debugMenu));
+        // });
+        // console.log(fc)
+
+
+        // ---------- DISPLAY A DIGITAL ELEVATION MODEL : ----------
+
+        // Add two elevation layers, each with a different level of detail. Here again, each layer's properties are
+        // defined in a json file.
+        function addElevationLayerFromConfig(config) {
+            config.source = new itowns.WMTSSource(config.source);
+            view.addLayer(
+                new itowns.ElevationLayer(config.id, config),
+            ).then(debugMenu.addLayerGUI.bind(debugMenu));
+        }
+        // itowns.Fetcher.json('./layers/JSONLayers/IGN_MNS_HIGHRES.json').then(addElevationLayerFromConfig);
+        // itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addElevationLayerFromConfig);
+        // itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json').then(addElevationLayerFromConfig);
+
+        var extent = new itowns.Extent('EPSG:4326',
+            112.9531610250001, 114.05454991477009,
+            22.56280321000013, 23.93585876665412);
+        // var wmsElevationSource = new itowns.WMSSource({
+        //     extent: extent,
+        //     url: 'http://localhost:8080/geoserver/ows',
+        //     name: 'geodata:geotiff_coverage',
+        //     crs: 'EPSG:4326',
+        //     width: 512,
+        //     format: 'image/jpeg',
+        // });
+
+        // // Add a WMS elevation layer
+        // var wmsElevationLayer = new itowns.ElevationLayer('wms_elevation', {
+        //     useColorTextureElevation: true,
+        //     colorTextureElevationMinZ: 0,
+        //     colorTextureElevationMaxZ: 1000,
+        //     source: wmsElevationSource,
+        // });
+
+        // view.addLayer(wmsElevationLayer);
+
+        // const elevation = new itowns.ElevationLayer('IGN_MNT', {
+        //     useColorTextureElevation: true,
+        //     colorTextureElevationMinZ: 0,
+        //     colorTextureElevationMaxZ: 1000,
+        //     "noDataValue": -99999,
+        //     source: new itowns.WMTSSource({
+        //         zoom: {
+        //             min: 0,
+        //             max: 10,
+        //         },
+        //         // extent: extent,
+        //         "url": "http://localhost:8080/geoserver/gwc/service/wmts",//'http://10.23.15.28:8888/geoserver/test/gwc/service/wmts',//"http://localhost:8080/geoserver/gwc/service/wmts",//"https://wxs.ign.fr/altimetrie/geoportail/wmts",
+        //         "crs": "EPSG:4326",
+        //         "format": "image/png",
+        //         "name": "geodata:geotiff_jinan",//'test:GuangZhou_aster_gdem_30m',//"geodata:geotiff_coverage",
+        //         "tileMatrixSet": "EPSG:4326",
+        //         "style": '',
+        //         geoserver: 1
+        //     }),
+        // });
+
+        // // // Add the layer
+        // view.addLayer(elevation);
+
+        // const colorLayer = new itowns.ColorLayer('OPENSM', {
+        //     source: new itowns.WMTSSource({
+        //         "url": "http://localhost:8080/geoserver/gwc/service/wmts",//"https://wxs.ign.fr/altimetrie/geoportail/wmts",
+        //         "crs": "EPSG:4326",
+        //         "format": "image/png",
+        //         "name": "geodata:geotiff_coverage",
+        //         "tileMatrixSet": "EPSG:4326",
+        //         "style": '',
+        //         geoserver: 1
+        //     }),
+        // });
+        // view.addLayer(colorLayer);
+
+        const tmsSource1 = new itowns.TMSSource({
+            // isInverted: true,
+            format: 'image/png',
+            url: 'https://dws.test.seewo.com/dws/3dmodel/gis/${z}/${x}/${y}.png',
+            // url: 'http://127.0.0.1:8802/dws/3dmodel/gis/${z}/${x}/${y}.png',
+            crs: 'EPSG:3857',
+            zoom: { min: 0, max: 17 }
+        });
+        const tmsSource2 = new itowns.TMSSource({
+            // isInverted: true,
+            format: 'image/png',
+            url:
+                // 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png',
+                // 'http://localhost:8089/tiles/${z}/${x}/${y}.png',
+                // 'http://localhost:8089/sichuan/${z}/${x}/${y}.png',
+                // 'https://dws.test.seewo.com/dws/3dmodel/gis/${z}/${x}/${y}.png',
+                'http://localhost:8089/shanxi/${z}/${x}/${y}.png',
+            crs: 'EPSG:4326',
+            zoom: { min: 5, max: 10 }
+        });
+        const tmsSource3 = new itowns.TMSSource({
+            // isInverted: true,
+            format: 'image/png',
+            url: 'http://localhost:8089/dom/${z}/${x}/${y}.png',
+            crs: 'EPSG:4326',
+            zoom: { min: 0, max: 17 }
+        });
+        const elevation = new itowns.ElevationLayer('IGN_MNT', {
+            useColorTextureElevation: true,
+            colorTextureElevationMinZ: 0,
+            colorTextureElevationMaxZ: 2569,
+            "noDataValue": -999999,
+            source: tmsSource2
+        });
+        // setTimeout(() => {
+        view.addLayer(elevation);
+        // }, 10000)
+
+        const colorLayer1 = new itowns.ColorLayer('OPENSM1', {
+            source: tmsSource1,
+        });
+        const colorLayer2 = new itowns.ColorLayer('OPENSM2', {
+            source: tmsSource2,
+        });
+        // const colorLayer3 = new itowns.ColorLayer('OPENSM3', {
+        //     source: tmsSource3,
+        // });
+        view.addLayer(colorLayer1).then(debugMenu.addLayerGUI.bind(debugMenu));
+        view.addLayer(colorLayer2).then(debugMenu.addLayerGUI.bind(debugMenu));
+        // view.addLayer(colorLayer3).then(debugMenu.addLayerGUI.bind(debugMenu));
+
+        setInterval(() => {
+            // console.log('calls', view.mainLoop.gfxEngine.renderer.info.render.calls)
+            console.log('zoom', view.controls.getZoom())
+        }, 100)
+
+        var mvtSource = new itowns.VectorTilesSource({
+            style: 'http://localhost:8089/vectorTile/data.json',
+            // We don't display mountains related data to ease visualisation
+            // filter: (layer) => !layer['source-layer'].includes('oro_') && !layer['source-layer'].includes('parcellaire'),
+        });
+
+        var mvtLayer = new itowns.ColorLayer('MVT', {
+            source: mvtSource,
+            effect_type: itowns.colorLayerEffects.removeLightColor,
+            effect_parameter: 2.5,
+            addLabelLayer: { performance: true },
+        });
+
+        // view.addLayer(mvtLayer);
+
+        // const extent = new itowns.Extent(
+        //     'EPSG:3946',
+        //     1837816.94334, 1847692.32501,
+        //     5170036.4587, 5178412.82698);
+
+        // var wmsElevationSource = new itowns.WMSSource({
+        //     extent: extent,
+        //     url: 'https://download.data.grandlyon.com/wms/grandlyon',
+        //     name: 'MNT2012_Altitude_10m_CC46',
+        //     crs: 'EPSG:3946',
+        //     width: 256,
+        //     format: 'image/jpeg',
+        // });
+
+        // Add a WMS elevation layer
+        // var wmsElevationLayer = new itowns.ElevationLayer('wms_elevation', {
+        //     useColorTextureElevation: true,
+        //     colorTextureElevationMinZ: 144,
+        //     colorTextureElevationMaxZ: 622,
+        //     source: wmsElevationSource,
+        // });
+
+        // view.addLayer(wmsElevationLayer);
+
+
+        // ---------- ADD SOME WIDGETS : ----------
+
+        // ADD A SCALE :
+        // const scale = new itowns_widgets.Scale(view, { position: 'bottom-right', translate: { x: -80 } });
+
+        // // ADD A MINIMAP :
+        // const minimap = new itowns_widgets.Minimap(
+        //     view,
+        //     new itowns.ColorLayer('minimap', {
+        //         source: new itowns.VectorTilesSource({
+        //             style: 'https://wxs.ign.fr/essentiels/static/vectorTiles/styles/PLAN.IGN/gris.json',
+        //             // We don't display mountains and plot related data to ease visualisation
+        //             filter: (layer) => !layer['source-layer'].includes('oro_')
+        //                 && !layer['source-layer'].includes('parcellaire'),
+        //         }),
+        //         addLabelLayer: { performance: true },
+        //     }),
+        //     { cursor: '+' },
+        // );
+
+        // // ADD NAVIGATION TOOLS :
+        // const navigation = new itowns_widgets.Navigation(view, {
+        //     position: 'bottom-right',
+        //     translate: { y: -40 },
+        // });
+
+        // ADD A SEARCH BAR :
+
+        // You can find more precise explanation on searchbar options in the doc
+        // (http://www.itowns-project.org/itowns/docs/#api/Widgets/Searchbar) and in the searchbar example
+        // (https://www.itowns-project.org/itowns/examples/#widgets_searchbar)
+
+        // Define options for geocoding service that should be used by the searchbar.
+        // const geocodingOptions = {
+        //     url: new URL(
+        //         'https://wxs.ign.fr/ayxvok72rcocdyn8xyvy32og/ols/apis/completion?text=&type=StreetAddress,' +
+        //         'PositionOfInterest',
+        //     ),
+        //     parser: (response) => {
+        //         const map = new Map();
+        //         response.results.forEach(location => {
+        //             map.set(location.fulltext, new itowns.Coordinates('EPSG:4326', location.x, location.y));
+        //         });
+        //         return map;
+        //     },
+        //     onSelected: (coordinates) => {
+        //         view.controls.lookAtCoordinate({ coord: coordinates, range: 20000, tilt: 45, heading: 0 });
+        //     },
+        // }
+
+        // // Create the searchbar
+        // const searchbar = new itowns_widgets.Searchbar(view, geocodingOptions, {
+        //     maxSuggestionNumber: 15,
+        //     placeholder: 'Search a location in France',
+        //     position: 'top-right',
+        // });
+
+
+
+        // ---------- DISPLAY ATMOSPHERIC LIGHTING : ----------
+
+        const atmosphere = view.getLayerById('atmosphere');
+        atmosphere.setRealisticOn(false);
+        view.getLayerById('atmosphere').visible = false;
+        view.getLayerById('atmosphere').fog.enable = false;
+
+
+
+        // ---------- DEBUG TOOLS : ----------
+
+        // Toggle atmospheric lighting on/off.
+        const cRL = debugMenu.addGUI('RealisticLighting', !view.isDebugMode, function (v) {
+            atmosphere.setRealisticOn(v);
+            view.notifyChange(atmosphere);
+        });
+
+        debug.createTileDebugUI(debugMenu.gui, view);
+
+
+        //--------------------------------------supercluser聚合
+        {
+            const pointGeojson = {
+                type: 'FeatureCollection',
+                features: Array.from({ length: 1000 }, (item, index) => {
+                    return {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': [
+                                Math.random() * (121.7 - 121.2) + 121.2,
+                                Math.random() * (31.4 - 30.9) + 30.9
+                            ]
+                        }
+                    };
+                })
+            };
+
+            const clusters = new Supercluster({
+                radius: 40,
+                maxZoom: 30
+            });
+            clusters.load(pointGeojson.features);
+
+            let group = null;
+
+            const worldExtent = new itowns.Extent(
+                'EPSG:4326',
+                [-180, 180],
+                [-90, 90]
+            );
+
+            function createClusterMarker(cluster, baseColor = 0x02A3FC) {
+                const marker = new itowns.THREE.Mesh(
+                    new itowns.THREE.SphereGeometry(100, 32, 32),
+                    new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+                );
+                const pos = new itowns.Coordinates('EPSG:4326', cluster.geometry.coordinates[0], cluster.geometry.coordinates[1], 0);
+                const { x, y, z } = pos.as('EPSG:4978')
+                marker.position.set(x, y, z);
+                marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+                marker.rotateX(Math.PI / 2);
+
+                return marker;
+            }
+
+            function createSingleMarker(cluster, baseColor = 0xffffff) {
+                const marker = new itowns.THREE.Mesh(
+                    new itowns.THREE.SphereGeometry(200, 16, 16),
+                    new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+                );
+                const pos = new itowns.Coordinates('EPSG:4326', cluster.geometry.coordinates[0], cluster.geometry.coordinates[1], 0);
+                const { x, y, z } = pos.as('EPSG:4978')
+                marker.position.set(x, y, z);
+                marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+                marker.rotateX(Math.PI / 2);
+                return marker;
+            }
+
+            // view.controls.addEventListener('range-changed', () => {
+            //     console.log(view.controls.getZoom())
+            //     const camera = view.camera.camera3D;
+            //     const zoom = view.controls.getZoom();
+
+            //     if (!group) {
+            //         group = new itowns.THREE.Group();
+            //         view.scene.add(group);
+            //     } else {
+            //         group.children.length = 0;
+            //     }
+
+            //     if (zoom < 12) {
+            //         clusters.getClusters([-180, -90, 180, 90], zoom).forEach((cluster) => {
+            //             if (cluster.id) {
+            //                 const marker = createClusterMarker(cluster);
+            //                 group.add(marker);
+            //             } else {
+            //                 const markerObj = createSingleMarker(cluster);
+            //                 group.add(markerObj);
+            //             }
+            //         });
+            //     } else {
+            //         clusters.getClusters([-180, -90, 180, 90], zoom).forEach((cluster) => {
+            //             if (cluster.id) {
+            //                 const markers = clusters.getLeaves(cluster.id);
+            //                 markers.forEach((marker) => {
+            //                     const markerObj = createSingleMarker(cluster);
+            //                     group.add(markerObj);
+            //                 });
+            //             } else {
+            //                 const markerObj = createSingleMarker(cluster);
+            //                 group.add(markerObj);
+            //             }
+
+            //         });
+
+            //     }
+
+            //     view.notifyChange(true);
+            // });
+        }
+
+
+        //----------------------------ndc聚合
+        {
+            const pointGeojson = {
+                type: 'FeatureCollection',
+                features: Array.from({ length: 1000 }, (item, index) => {
+                    return {
+                        'type': 'Feature',
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': [
+                                Math.random() * (121.7 - 121.2) + 121.2,
+                                Math.random() * (31.4 - 30.9) + 30.9
+                            ]
+                        }
+                    };
+                })
+            };
+
+            let group = null;
+
+            const minimumClusterSize = 2
+            function transform3dTo2d(coord) {
+                const point2D = coord.clone().project(view.camera.camera3D);
+                point2D.x = ((point2D.x + 1) / 2) * view.mainLoop.gfxEngine.width;
+                point2D.y = (-(point2D.y - 1) / 2) * view.mainLoop.gfxEngine.height;
+                point2D.coord = coord
+                point2D.clustered = false
+                return point2D
+            };
+
+            function handleCluster() {
+                let points = []
+                points = getSpaceCoords(points)
+                const index = new KDBush(points.length, 64, Uint32Array);
+                for (let p = 0; p < points.length; ++p) {
+                    index.add(points[p].x, points[p].y);
+                }
+                index.finish();
+
+                if (!group) {
+                    group = new itowns.THREE.Group();
+                    view.scene.add(group);
+                } else {
+                    group.children.length = 0;
+                }
+
+                for (let i = 0; i < points.length; ++i) {
+                    if (points[i].coord.z < 3000000)
+                        alert(1)
+                }
+                for (let i = 0; i < points.length; ++i) {
+                    let point = points[i]
+                    if (point.clustered) {
+                        continue
+                    }
+                    point.clustered = true
+                    // neighbors = index.range(points[i].x - 10, points[i].y - 10, points[i].x + 10, points[i].y + 10);
+                    neighbors = index.within(points[i].x, points[i].y, 100)
+
+                    const neighborLength = neighbors?.length
+                    const numPoints = neighborLength
+                    if (numPoints >= minimumClusterSize) {
+                        const coord = new itowns.THREE.Vector3()
+                        for (j = 0; j < neighborLength; ++j) {
+                            neighborIndex = neighbors[j]
+                            neighborPoint = points[neighborIndex]
+                            if (!neighborPoint.clustered) {
+                                neighborPoint.clustered = true
+                            }
+                            coord.add(neighborPoint.coord)
+                        }
+
+                        coord.multiplyScalar(1.0 / numPoints)
+                        group.add(addCluster(coord))
+                    } else {
+                        group.add(addNonClusteredItem(point.coord))
+                    }
+                }
+                view.notifyChange(true);
+            }
+
+            function getSpaceCoords(points) {
+                pointGeojson.features.forEach((point, index) => {
+                    const pos = new itowns.Coordinates('EPSG:4326', point.geometry.coordinates[0], point.geometry.coordinates[1], 0);
+                    const { x, y, z } = pos.as('EPSG:4978')
+                    let point2d = transform3dTo2d(new itowns.THREE.Vector3(x, y, z))
+                    if (
+                        (
+                            point2d.x > 0 &&
+                            point2d.x < view.mainLoop.gfxEngine.width &&
+                            point2d.y > 0 &&
+                            point2d.y < view.mainLoop.gfxEngine.width
+                        )
+                    ) {
+                        points.push(point2d)
+                    }
+                })
+                return points
+            }
+
+            function addCluster({ x, y, z }, baseColor = 0x02A3FC) {
+                const marker = new itowns.THREE.Mesh(
+                    new itowns.THREE.SphereGeometry(300, 32, 32),
+                    new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+                );
+                marker.position.set(x, y, z);
+                marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+                marker.rotateX(Math.PI / 2);
+
+                return marker;
+            }
+
+            function addNonClusteredItem({ x, y, z }, baseColor = 0xffffff) {
+                const marker = new itowns.THREE.Mesh(
+                    new itowns.THREE.SphereGeometry(400, 16, 16),
+                    new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+                );
+                marker.position.set(x, y, z);
+                marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+                marker.rotateX(Math.PI / 2);
+                return marker;
+            }
+
+            // view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_CAMERA_UPDATE, handleCluster);
+            // view.controls.addEventListener(itowns.CONTROL_EVENTS.RANGE_CHANGED, handleCluster);
+            // view.controls.addEventListener(itowns.CONTROL_EVENTS.PAN_CHANGED, handleCluster);
+            // view.controls.addEventListener(itowns.CONTROL_EVENTS.ORIENTATION_CHANGED, handleCluster);
+            // view.controls.addEventListener(itowns.CONTROL_EVENTS.CAMERA_TARGET_CHANGED, handleCluster);
+        }
+
+        //------------------------------bvh聚合
+        { }
+    </script>
+</body>
+
+</html>

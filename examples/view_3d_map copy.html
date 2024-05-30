@@ -1,0 +1,366 @@
+<html>
+
+<head>
+    <title>Itowns - Globe</title>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" type="text/css" href="css/example.css">
+    <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+    <link rel="stylesheet" type="text/css" href="css/widgets.css">
+    <script src="https://cdn.jsdelivr.net/npm/kdbush"></script>
+    <script src="https://unpkg.com/supercluster@8.0.1/dist/supercluster.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+</head>
+
+<body>
+    <div id="viewerDiv"></div>
+
+    <!-- Import iTowns source code -->
+    <script src="../dist/itowns.js"></script>
+    <script src="../dist/debug.js"></script>
+    <!-- Import iTowns Widgets plugin -->
+    <script src="../dist/itowns_widgets.js"></script>
+    <!-- Import iTowns LoadingScreen and GuiTools plugins -->
+    <script src="js/GUI/GuiTools.js"></script>
+    <script src="js/GUI/LoadingScreen.js"></script>
+
+
+    <script type="text/javascript">
+
+
+
+        // ---------- CREATE A GlobeView FOR SUPPORTING DATA VISUALIZATION : ----------
+
+        // Define camera initial position
+        const placement = {
+            coord: new itowns.Coordinates('EPSG:4326', 121.5, 31.1),
+            range: 2500,
+        }
+
+        // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+        const viewerDiv = document.getElementById('viewerDiv');
+
+        // Create a GlobeView
+        const view = new itowns.GlobeView(viewerDiv, placement);
+
+        // Setup loading screen and debug menu
+        setupLoadingScreen(viewerDiv, view);
+        const debugMenu = new GuiTools('menuDiv', view);
+
+
+
+        // ---------- DISPLAY ORTHO-IMAGES : ----------
+
+        // Add one imagery layer to the scene. This layer's properties are defined in a json file, but it could be
+        // defined as a plain js object. See `Layer` documentation for more info.
+        itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(function _(config) {
+            config.source = new itowns.WMTSSource(config.source);
+            view.addLayer(
+                new itowns.ColorLayer('Ortho', config),
+            ).then(debugMenu.addLayerGUI.bind(debugMenu));
+        });
+
+
+
+        // ---------- DISPLAY A DIGITAL ELEVATION MODEL : ----------
+
+        // Add two elevation layers, each with a different level of detail. Here again, each layer's properties are
+        // defined in a json file.
+        function addElevationLayerFromConfig(config) {
+            config.source = new itowns.WMTSSource(config.source);
+            view.addLayer(
+                new itowns.ElevationLayer(config.id, config),
+            ).then(debugMenu.addLayerGUI.bind(debugMenu));
+        }
+        itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addElevationLayerFromConfig);
+        itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json').then(addElevationLayerFromConfig);
+
+
+        // ---------- ADD SOME WIDGETS : ----------
+
+        // ADD A SCALE :
+        const scale = new itowns_widgets.Scale(view, { position: 'bottom-right', translate: { x: -80 } });
+
+        // ADD A MINIMAP :
+        const minimap = new itowns_widgets.Minimap(
+            view,
+            new itowns.ColorLayer('minimap', {
+                source: new itowns.VectorTilesSource({
+                    style: 'https://wxs.ign.fr/essentiels/static/vectorTiles/styles/PLAN.IGN/gris.json',
+                    // We don't display mountains and plot related data to ease visualisation
+                    filter: (layer) => !layer['source-layer'].includes('oro_')
+                        && !layer['source-layer'].includes('parcellaire'),
+                }),
+                addLabelLayer: { performance: true },
+            }),
+            { cursor: '+' },
+        );
+
+        // ADD NAVIGATION TOOLS :
+        const navigation = new itowns_widgets.Navigation(view, {
+            position: 'bottom-right',
+            translate: { y: -40 },
+        });
+
+        // ADD A SEARCH BAR :
+
+        // You can find more precise explanation on searchbar options in the doc
+        // (http://www.itowns-project.org/itowns/docs/#api/Widgets/Searchbar) and in the searchbar example
+        // (https://www.itowns-project.org/itowns/examples/#widgets_searchbar)
+
+        // Define options for geocoding service that should be used by the searchbar.
+        const geocodingOptions = {
+            url: new URL(
+                'https://wxs.ign.fr/ayxvok72rcocdyn8xyvy32og/ols/apis/completion?text=&type=StreetAddress,' +
+                'PositionOfInterest',
+            ),
+            parser: (response) => {
+                const map = new Map();
+                response.results.forEach(location => {
+                    map.set(location.fulltext, new itowns.Coordinates('EPSG:4326', location.x, location.y));
+                });
+                return map;
+            },
+            onSelected: (coordinates) => {
+                view.controls.lookAtCoordinate({ coord: coordinates, range: 20000, tilt: 45, heading: 0 });
+            },
+        }
+
+        // Create the searchbar
+        const searchbar = new itowns_widgets.Searchbar(view, geocodingOptions, {
+            maxSuggestionNumber: 15,
+            placeholder: 'Search a location in France',
+            position: 'top-right',
+        });
+
+
+
+        // ---------- DISPLAY ATMOSPHERIC LIGHTING : ----------
+
+        const atmosphere = view.getLayerById('atmosphere');
+        atmosphere.setRealisticOn(!view.isDebugMode);
+
+
+
+        // ---------- DEBUG TOOLS : ----------
+
+        // Toggle atmospheric lighting on/off.
+        const cRL = debugMenu.addGUI('RealisticLighting', !view.isDebugMode, function (v) {
+            atmosphere.setRealisticOn(v);
+            view.notifyChange(atmosphere);
+        });
+
+        debug.createTileDebugUI(debugMenu.gui, view);
+
+
+        //--------------------------------------supercluser聚合
+        const pointGeojson = {
+            type: 'FeatureCollection',
+            features: Array.from({ length: 1000 }, (item, index) => {
+                return {
+                    'type': 'Feature',
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': [
+                            Math.random() * (121.7 - 121.2) + 121.2,
+                            Math.random() * (31.4 - 30.9) + 30.9
+                        ]
+                    }
+                };
+            })
+        };
+
+        const clusters = new Supercluster({
+            radius: 40,
+            maxZoom: 30
+        });
+        clusters.load(pointGeojson.features);
+
+        let group = null;
+
+        const worldExtent = new itowns.Extent(
+            'EPSG:4326',
+            [-180, 180],
+            [-90, 90]
+        );
+
+        function createClusterMarker(cluster, baseColor = 0x02A3FC) {
+            const marker = new itowns.THREE.Mesh(
+                new itowns.THREE.SphereGeometry(100, 32, 32),
+                new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+            );
+            const pos = new itowns.Coordinates('EPSG:4326', cluster.geometry.coordinates[0], cluster.geometry.coordinates[1], 0);
+            const { x, y, z } = pos.as('EPSG:4978')
+            marker.position.set(x, y, z);
+            marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+            marker.rotateX(Math.PI / 2);
+
+            return marker;
+        }
+
+        function createSingleMarker(cluster, baseColor = 0xffffff) {
+            const marker = new itowns.THREE.Mesh(
+                new itowns.THREE.SphereGeometry(200, 16, 16),
+                new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+            );
+            const pos = new itowns.Coordinates('EPSG:4326', cluster.geometry.coordinates[0], cluster.geometry.coordinates[1], 0);
+            const { x, y, z } = pos.as('EPSG:4978')
+            marker.position.set(x, y, z);
+            marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+            marker.rotateX(Math.PI / 2);
+            return marker;
+        }
+
+        // view.controls.addEventListener('range-changed', () => {
+        //     console.log(view.controls.getZoom())
+        //     const camera = view.camera.camera3D;
+        //     const zoom = view.controls.getZoom();
+
+        //     if (!group) {
+        //         group = new itowns.THREE.Group();
+        //         view.scene.add(group);
+        //     } else {
+        //         group.children.length = 0;
+        //     }
+
+        //     if (zoom < 12) {
+        //         clusters.getClusters([-180, -90, 180, 90], zoom).forEach((cluster) => {
+        //             if (cluster.id) {
+        //                 const marker = createClusterMarker(cluster);
+        //                 group.add(marker);
+        //             } else {
+        //                 const markerObj = createSingleMarker(cluster);
+        //                 group.add(markerObj);
+        //             }
+        //         });
+        //     } else {
+        //         clusters.getClusters([-180, -90, 180, 90], zoom).forEach((cluster) => {
+        //             if (cluster.id) {
+        //                 const markers = clusters.getLeaves(cluster.id);
+        //                 markers.forEach((marker) => {
+        //                     const markerObj = createSingleMarker(cluster);
+        //                     group.add(markerObj);
+        //                 });
+        //             } else {
+        //                 const markerObj = createSingleMarker(cluster);
+        //                 group.add(markerObj);
+        //             }
+
+        //         });
+
+        //     }
+
+        //     view.notifyChange(true);
+        // });
+
+        //----------------------------ndc聚合
+        const minimumClusterSize = 2
+        function transform3dTo2d(coord) {
+            const point2D = coord.clone().project(view.camera.camera3D);
+            point2D.x = ((point2D.x + 1) / 2) * view.mainLoop.gfxEngine.width;
+            point2D.y = (-(point2D.y - 1) / 2) * view.mainLoop.gfxEngine.height;
+            point2D.coord = coord
+            point2D.clustered = false
+            return point2D
+        };
+
+        function handleCluster() {
+            let points = []
+            points = getSpaceCoords(points)
+            const index = new KDBush(points.length, 64, Uint32Array);
+            for (let p = 0; p < points.length; ++p) {
+                index.add(points[p].x, points[p].y);
+            }
+            index.finish();
+
+            if (!group) {
+                group = new itowns.THREE.Group();
+                view.scene.add(group);
+            } else {
+                group.children.length = 0;
+            }
+
+            for (let i = 0; i < points.length; ++i) {
+                let point = points[i]
+                if (point.clustered) {
+                    continue
+                }
+                point.clustered = true
+                // neighbors = index.range(points[i].x, points[i].y, points[i].x + 300, points[i].y + 300);
+                neighbors = index.within(points[i].x, points[i].y, 10)
+
+                const neighborLength = neighbors?.length
+                const numPoints = neighborLength
+                if (numPoints >= minimumClusterSize) {
+                    point.coord = new itowns.THREE.Vector3()
+                    for (j = 0; j < neighborLength; ++j) {
+                        neighborIndex = neighbors[j]
+                        neighborPoint = points[neighborIndex]
+                        if (!neighborPoint.clustered) {
+                            neighborPoint.clustered = true
+                        }
+                        point.coord.add(neighborPoint.coord)
+                    }
+
+                    console.log(point.coord, numPoints, point.clustered)
+                    point.coord.multiplyScalar(1.0 / numPoints)
+                    group.add(addCluster(point.coord))
+                } else {
+                    console.log(point.coord, numPoints, point.clustered)
+                    group.add(addNonClusteredItem(point.coord))
+                }
+            }
+            view.notifyChange(true);
+        }
+
+        function getSpaceCoords(points) {
+            pointGeojson.features.forEach((point, index) => {
+                const pos = new itowns.Coordinates('EPSG:4326', point.geometry.coordinates[0], point.geometry.coordinates[1], 0);
+                const { x, y, z } = pos.as('EPSG:4978')
+                let point2d = transform3dTo2d(new itowns.THREE.Vector3(x, y, z))
+                if (
+                    (
+                        point2d.x > 0 &&
+                        point2d.x < view.mainLoop.gfxEngine.width &&
+                        point2d.y > 0 &&
+                        point2d.y < view.mainLoop.gfxEngine.width
+                    )
+                ) {
+                    points.push(point2d)
+                }
+            })
+            return points
+        }
+
+        function addCluster({ x, y, z }, baseColor = 0x02A3FC) {
+            const marker = new itowns.THREE.Mesh(
+                new itowns.THREE.SphereGeometry(300, 32, 32),
+                new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+            );
+            marker.position.set(x, y, z);
+            marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+            marker.rotateX(Math.PI / 2);
+
+            return marker;
+        }
+
+        function addNonClusteredItem({ x, y, z }, baseColor = 0xffffff) {
+            const marker = new itowns.THREE.Mesh(
+                new itowns.THREE.SphereGeometry(400, 16, 16),
+                new itowns.THREE.MeshBasicMaterial({ color: baseColor })
+            );
+            marker.position.set(x, y, z);
+            marker.lookAt(new itowns.THREE.Vector3(0, 0, 0));
+            marker.rotateX(Math.PI / 2);
+            return marker;
+        }
+
+        view.controls.addEventListener(itowns.CONTROL_EVENTS.RANGE_CHANGED, handleCluster);
+        // view.camera.camera3D.addEventListener('change', handleCluster);
+        // view.addEventListener(itowns.MAIN_LOOP_EVENTS.BEFORE_CAMERA_UPDATE, handleCluster)
+    </script>
+</body>
+
+</html>
